@@ -1,35 +1,59 @@
 import sqlite3
 
-def inicializar_sistema():
+def crear_base_datos():
     conn = sqlite3.connect('inventario.db')
     cursor = conn.cursor()
 
-    # 1. Maestro de Empresas
-    cursor.execute('''CREATE TABLE IF NOT EXISTS empresas 
-        (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE)''')
+    # 1. Tabla de Empresas
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS empresas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT UNIQUE NOT NULL
+        )
+    ''')
 
-    # 2. Usuarios: Amarrados a la empresa
-    cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios 
-        (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, 
-         empresa_id INTEGER, 
-         FOREIGN KEY(empresa_id) REFERENCES empresas(id))''')
+    # 2. Tabla de Departamentos (Para la jerarquía solicitada)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS departamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            empresa_id INTEGER,
+            FOREIGN KEY (empresa_id) REFERENCES empresas (id)
+        )
+    ''')
 
-    # 3. Productos: Amarrados a la empresa
-    cursor.execute('''CREATE TABLE IF NOT EXISTS productos 
-        (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, stock INTEGER, precio REAL, 
-         empresa_id INTEGER, 
-         FOREIGN KEY(empresa_id) REFERENCES empresas(id))''')
+    # 3. Tabla de Usuarios (Incluye rol y nombre_real)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            empresa_id INTEGER,
+            departamento_id INTEGER,
+            rol TEXT, -- SuperAdmin o Encargado
+            nombre_real TEXT,
+            FOREIGN KEY (empresa_id) REFERENCES empresas (id),
+            FOREIGN KEY (departamento_id) REFERENCES departamentos (id)
+        )
+    ''')
 
-    # 4. Movimientos (Compras/Ventas): El registro histórico amarrado a la empresa
-    cursor.execute('''CREATE TABLE IF NOT EXISTS movimientos 
-        (id INTEGER PRIMARY KEY AUTOINCREMENT, producto_id INTEGER, tipo TEXT, 
-         cantidad INTEGER, precio_unitario REAL, fecha DATETIME DEFAULT CURRENT_TIMESTAMP, 
-         empresa_id INTEGER,
-         FOREIGN KEY(producto_id) REFERENCES productos(id),
-         FOREIGN KEY(empresa_id) REFERENCES empresas(id))''')
+    # 4. Tabla de Productos
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS productos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            stock INTEGER DEFAULT 0,
+            precio REAL DEFAULT 0.0,
+            empresa_id INTEGER,
+            departamento_id INTEGER,
+            FOREIGN KEY (empresa_id) REFERENCES empresas (id),
+            FOREIGN KEY (departamento_id) REFERENCES departamentos (id)
+        )
+    ''')
 
     conn.commit()
     conn.close()
+    print("✅ Base de datos 'inventario.db' creada con la estructura correcta.")
 
 if __name__ == "__main__":
-    inicializar_sistema()
+    crear_base_datos()
