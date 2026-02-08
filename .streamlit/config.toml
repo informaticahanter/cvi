@@ -1,0 +1,17 @@
+[client]
+toolbarMode = "minimal"
+
+[ui]
+hideTopBar = true
+
+[theme]
+base="dark"
+primaryColor="#F63366"
+backgroundColor="#0E1117"
+secondaryBackgroundColor="#262730"
+textColor="#FAFAFA"
+font="sans serif"
+
+CLOUDFLARE_ACCOUNT_ID = "34c44d9d719d5977b5d87ac439c8a9bb"
+CLOUDFLARE_DATABASE_ID = "bdd5ca1c-4a91-4f66-9068-737fd78c8571"
+CLOUDFLARE_API_TOKEN = "d-4rBHRWFZeyBZrJU4NFcT0vbdbwmAivC6HZ6ZCv"
