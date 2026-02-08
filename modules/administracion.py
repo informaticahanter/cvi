@@ -1,82 +1,42 @@
 import streamlit as st
-import sqlite3
+from modules.database import query_d1
 import pandas as pd
 
-def get_connection():
-    return sqlite3.connect('inventario.db')
+def render_dashboard():
+    st.header("📊 Panel de Control - ORBERP")
+    empresa_id = st.session_state.get('empresa_id')
 
-def render_gestion_departamentos():
-    st.header("🏢 Gestión de Departamentos")
-    empresa_id = st.session_state.empresa_id
+    # 1. MÉTRICAS RÁPIDAS
+    col1, col2, col3 = st.columns(3)
+    
+    total_ventas = query_d1("SELECT SUM(total) as total FROM ventas WHERE empresa_id = ?", [empresa_id])[0]['total'] or 0
+    total_compras = query_d1("SELECT SUM(total) as total FROM compras WHERE empresa_id = ?", [empresa_id])[0]['total'] or 0
+    prod_criticos = query_d1("SELECT COUNT(*) as cuenta FROM productos WHERE empresa_id = ? AND stock <= stock_minimo", [empresa_id])[0]['cuenta']
 
-    # --- SECCIÓN 1: CREAR DEPARTAMENTO ---
-    with st.expander("➕ Crear Nuevo Departamento", expanded=True):
-        with st.form("form_dept"):
-            nombre_dept = st.text_input("Nombre del Departamento", placeholder="Ej: Almacén Central")
-            if st.form_submit_button("Registrar Departamento"):
-                if nombre_dept:
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("INSERT INTO departamentos (nombre, empresa_id) VALUES (?, ?)", 
-                                     (nombre_dept, empresa_id))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"Departamento '{nombre_dept}' creado.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-                else:
-                    st.warning("Escriba un nombre.")
+    col1.metric("Ingresos Totales", f"${total_ventas:,.2f}")
+    col2.metric("Inversión en Compras", f"${total_compras:,.2f}")
+    col3.metric("Alertas de Inventario", prod_criticos, delta_color="inverse")
 
-    # --- SECCIÓN 2: LISTADO Y ASIGNACIÓN ---
-    st.subheader("📋 Departamentos Existentes")
-    conn = get_connection()
-    depts = pd.read_sql_query("SELECT * FROM departamentos WHERE empresa_id = ?", conn, params=(empresa_id,))
-    conn.close()
+    st.divider()
 
-    if not depts.empty:
-        st.dataframe(depts[['id', 'nombre']], use_container_width=True, hide_index=True)
-    else:
-        st.info("Aún no hay departamentos creados.")
+    # 2. ALERTAS Y GRÁFICOS
+    left_col, right_col = st.columns(2)
 
-def render_gestion_usuarios():
-    st.header("👥 Gestión de Usuarios y Jerarquías")
-    empresa_id = st.session_state.empresa_id
+    with left_col:
+        st.subheader("⚠️ Stock por Agotarse")
+        stock_bajo = query_d1("SELECT nombre, stock, stock_minimo FROM productos WHERE empresa_id = ? AND stock <= stock_minimo LIMIT 5", [empresa_id])
+        if stock_bajo:
+            st.warning("Los siguientes productos requieren reposición inmediata:")
+            st.table(stock_bajo)
+        else:
+            st.success("✅ Todo el inventario está en niveles óptimos.")
 
-    # Obtener departamentos para el selectbox
-    conn = get_connection()
-    depts = pd.read_sql_query("SELECT id, nombre FROM departamentos WHERE empresa_id = ?", conn, params=(empresa_id,))
-    conn.close()
-
-    with st.container(border=True):
-        st.write("### Registrar Nuevo Usuario")
-        u_nombre = st.text_input("Nombre Real", key="user_real")
-        u_user = st.text_input("Nombre de Usuario", key="user_log")
-        u_pass = st.text_input("Contraseña", type="password", key="user_pass")
-        
-        # Selección de Departamento y Rol (Jerarquía)
-        col1, col2 = st.columns(2)
-        with col1:
-            # Los usuarios se agregan por departamento
-            opciones_dept = {row['nombre']: row['id'] for _, row in depts.iterrows()}
-            u_dept = st.selectbox("Asignar a Departamento", options=list(opciones_dept.keys()))
-        with col2:
-            # Jerarquía: Súper Administrador y Encargado
-            u_rol = st.selectbox("Rol / Jerarquía", ["Encargado", "Súper Administrador"])
-
-        if st.button("Crear Usuario", use_container_width=True):
-            if u_nombre and u_user and u_pass:
-                try:
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    dept_id = opciones_dept[u_dept]
-                    cursor.execute("""
-                        INSERT INTO usuarios (username, password, empresa_id, departamento_id, rol, nombre_real)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (u_user, u_pass, empresa_id, dept_id, u_rol, u_nombre))
-                    conn.commit()
-                    conn.close()
-                    st.success("Usuario creado exitosamente.")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+    with right_col:
+        st.subheader("📈 Ventas Recientes")
+        # Aquí simularíamos un gráfico con los datos de ventas
+        ventas_data = query_d1("SELECT fecha, total FROM ventas WHERE empresa_id = ? ORDER BY fecha DESC LIMIT 10", [empresa_id])
+        if ventas_data:
+            df = pd.DataFrame(ventas_data)
+            st.line_chart(df.set_index('fecha'))
+        else:
+            st.info("Aún no hay datos para graficar.")
